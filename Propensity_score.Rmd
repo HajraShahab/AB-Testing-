@@ -1,0 +1,136 @@
+---
+html_document: default
+author: "Hajra Shahab"
+date: "FALL 2021"
+output:
+  pdf_document:
+    keep_tex: yes
+  html_document:
+    df_print: paged
+pdf_document: default
+title: "A/B Testing HW-2"
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo=T,warning=F)
+
+require("data.table")
+library(data.table)
+require("stargazer")
+library(stargazer)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.packages("ggthemes")
+library(ggthemes)
+# install.packages("tidyverse")
+library(tidyverse)
+# install.packages("pwr")
+library(pwr)
+require("plm")
+library(plm)
+require("AER")
+library(AER)
+install.packages("MatchIt")
+library(MatchIt)
+
+# SET YOUR WORKING DIRECTORY HERE
+setwd("//Users/hajrashahab/Documents/Fall Semester 2021 /AB Testing/Homework/Homework 3")
+
+#clear environment
+rm(list=ls());gc()
+
+```
+
+```{r}
+
+#load dataset
+MyData = fread(input='HW-3.csv', verbose = F)
+
+```
+
+```{r}
+#Question 1 (check for multiple variables)
+ols<-lm(math12~catholic,data=MyData)
+
+olscontrols1<-lm(math12~catholic +
+                      factor(female) +
+                      factor(race) +
+                     factor(hsgrad),
+                    data=MyData)
+
+olscontrols2<-lm(math12~catholic +
+                    math8+
+                      factor(female) +
+                      factor(race) +
+                      factor(parmar8) +
+                     faminc8+ 
+                    factor(fathed8) +
+                    factor(hsgrad) + 
+                    factor(riskdrop8) +
+                     factor(mothed8),
+                    data=MyData)
+```
+
+
+```{r}
+stargazer(ols, olscontrols1, olscontrols2,
+title="Without PSM",
+type="text",
+model.numbers = F,
+column.labels=c("OLS","OLS With Controls - 1","OLS With Controls - 2"))
+```
+
+```{r}
+#Question 2 
+
+#set a fixed seed
+set.seed(1979) 
+
+#match treated/control on grades 
+Match <- matchit(catholic ~ math8,
+                 data = MyData,
+                 method = 'nearest', caliper=0.002)
+
+#summarize quality of matched sample
+summary(Match)
+
+```
+
+```{r}
+#identify matched sample
+MyData.match <- data.table(match.data(Match))
+Matched.ids <- MyData$id %in% MyData.match$id
+MyData[, match := Matched.ids]
+Matched.ids.sum <- MyData$id %in% MyData.match$id
+MyData[, match := Matched.ids.sum]
+table(MyData$match)
+```
+
+```{r}
+#t-test differences in means before and after match
+t.test(
+  MyData$math8 [MyData$catholic ==0],
+  MyData$math8 [MyData$catholic ==1],
+        alternative = "two.sided")
+
+t.test(
+  MyData$math8 [MyData$catholic ==0
+                 & MyData$match ==1],
+  MyData$math8 [MyData$catholic ==1
+                 & MyData$match ==1],
+        alternative = "two.sided")
+
+```
+
+
+```{r}
+#in the MATCHED sample only
+m.catholic <-
+  lm(math12 ~ catholic,
+      data=MyData [match == TRUE])
+print(summary(m.catholic))
+````
