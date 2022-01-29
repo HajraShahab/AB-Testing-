@@ -1,0 +1,176 @@
+---
+title: "Project"
+output: html_notebook
+author: "Beth Root, Alex Talbott, Anum Malik, Manzoor Mirza, Safi, Hajra Shahab"
+---
+
+```{r}
+
+knitr::opts_chunk$set(echo=T,warning=F)
+
+#install.packages("data.table")
+library(data.table)
+#install.packages("stargazer")
+library(stargazer)
+#install.packages("ggplot2")
+library(ggplot2)
+#install.packages("ggthemes")
+library(ggthemes)
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("pwr")
+library(pwr)
+#install.packages("plm")
+library(plm)
+#install.packages("AER")
+library(AER)
+#install.packages("MatchIt")
+library(MatchIt)
+library(ggplot2)
+
+# SET YOUR WORKING DIRECTORY HERE
+# setwd("~/Fall 2021/AB Testing/project")
+
+#clear environment
+rm(list=ls());gc()
+
+```
+
+```{r}
+#load dataset
+scooter = fread(input='scooter_usage_results.csv', verbose = F)
+questions <- scooter[1]
+
+scooter <- scooter[-c(1,2)]
+```
+
+```{r}
+
+ggplot(scooter, aes(x=gender, fill=gender)) + geom_bar() + ggtitle('Gender Distribution')
+
+ggplot(scooter, aes(x=income, fill=income))+ 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle('Income Distribution')
+
+ggplot(scooter, aes(x=age, fill=age))+ geom_bar() + ggtitle('Age Distribution')
+
+
+```
+
+```{r}
+scooter <- scooter %>%
+  mutate(treated = if_else(treatment_ques == 'Yes' | treatment_ques == 'No', 1, 0))
+
+ggplot(scooter, aes(x=treated, fill=treated)) + geom_bar() + 
+  ggtitle('Treatment Distribution')
+```
+
+```{r}
+scooter_control <- scooter %>%
+  filter(treated == 0)
+
+scooter_treatment <- scooter %>%
+  filter(treated == 1)
+```
+
+```{r}
+## Distributions for Control
+ggplot(scooter_control, aes(x=gender, fill=gender)) + geom_bar() + ggtitle('Control Group: Gender Distribution')
+
+ggplot(scooter_control, aes(x=income, fill=income))+ 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle('Control Group: Income Distribution')
+
+ggplot(scooter_control, aes(x=age, fill=age))+ geom_bar() + ggtitle('Control Group: Age Distribution')
+```
+
+```{r}
+## Distribution for Treatment
+ggplot(scooter_treatment, aes(x=gender, fill=gender)) + geom_bar() + 
+  ggtitle('Treatment Group: Gender Distribution')
+
+ggplot(scooter_treatment, aes(x=income, fill=income))+ 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggtitle('Treatment Group: Income Distribution')
+
+ggplot(scooter_treatment, aes(x=age, fill=age))+ geom_bar() + 
+  ggtitle('Treatment Group: Age Distribution')
+
+```
+
+```{r}
+# power analysis
+
+# counts
+n1 <- nrow(scooter_treatment)
+n2 <- nrow(scooter_control)
+
+# power of analysis (assuming large effect size)
+pwrt <- pwr.t2n.test(d= 0.50,
+                     n1 = n1,
+                     n2 = n2,
+                     sig.level = 0.05,
+                     power = NULL)
+pwrt$power
+
+# power of heterogenous effect (scooter safety high/low) assuming large effect size
+# high
+scooter_treatment_high <- scooter_treatment[scooter_treatment$safety_rating %in% 
+                                              c("5: Perfectly safe",
+                                                "4: Acceptably safe",
+                                                "3: Partially safe")]
+scooter_control_high <- scooter_control[scooter_control$safety_rating %in% 
+                                              c("5: Perfectly safe",
+                                                "4: Acceptably safe",
+                                                "3: Partially safe")]
+n1 <- nrow(scooter_treatment_high)
+n2 <- nrow(scooter_control_high)
+
+# power of analysis (assuming large effect size)
+pwrt <- pwr.t2n.test(d= 0.50,
+                     n1 = n1,
+                     n2 = n2,
+                     sig.level = 0.05,
+                     power = NULL)
+pwrt$power
+
+# low
+scooter_treatment_low <- scooter_treatment[scooter_treatment$safety_rating %in%
+                                             c("1: Not very safe",
+                                               "2: Minimally safe")]
+scooter_control_low <- scooter_control[scooter_control$safety_rating %in% 
+                                            c("1: Not very safe",
+                                               "2: Minimally safe")]
+n1 <- nrow(scooter_treatment_low)
+n2 <- nrow(scooter_control_low)
+
+# power of analysis (assuming large effect size)
+pwrt <- pwr.t2n.test(d= 0.50,
+                     n1 = n1,
+                     n2 = n2,
+                     sig.level = 0.05,
+                     power = NULL)
+pwrt$power
+```
+
+```{r}
+# regression and results
+scooter_lm <- lm(outcome_scoot_change ~ treatment_ques, data=scooter_treatment)
+
+
+
+scooter_lm$coefficients
+stargazer(scooter_lm,
+          title="OLS",
+          type="text",
+          model.numbers=FALSE,
+          column.labels=c("simple OLS"),
+          font.size = "tiny",
+          single.row=TRUE)
+
+```
+
+
